@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/api/msds/:path*",
+      "destination": "https://apis.data.go.kr/B552468/msdschem/:path*"
+    },
+    {
+      "source": "/api/pubchem/:path*",
+      "destination": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
