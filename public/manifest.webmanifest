@@ -1,0 +1,17 @@
+{
+  "name": "EasyMSDS",
+  "short_name": "EasyMSDS",
+  "description": "KOSHA MSDS 및 3D 화학 분자 구조 통합 검색",
+  "theme_color": "#10b981",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
