@@ -318,7 +318,7 @@ body {
     max-width: 100%;
     padding: 0;
   }
-  .search-section, .btn {
+  .search-section, .btn, .no-print {
     display: none !important;
   }
   .card {
