@@ -191,6 +191,8 @@ body {
   background: #f1f5f9;
   border-radius: 12px;
   display: flex;
+  position: relative;
+  overflow: hidden;
   align-items: center;
   justify-content: center;
   overflow: hidden;
