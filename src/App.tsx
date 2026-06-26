@@ -49,6 +49,7 @@ function App() {
   
   const printRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
+  const glViewerRef = useRef<any>(null);
 
   const handlePrint = () => {
     window.print();
@@ -216,42 +217,56 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    if (pubchemInfo?.has3d && viewerRef.current) {
-      viewerRef.current.innerHTML = '';
-      if (!(window as any).$3Dmol) {
-        const script = document.createElement('script');
-        script.src = 'https://3Dmol.org/build/3Dmol-min.js';
-        script.onload = render3D;
-        document.head.appendChild(script);
-      } else {
-        render3D();
-      }
+  const updateStyle = (glViewer: any, style: string) => {
+    if (style === 'stick') {
+      glViewer.setStyle({}, { stick: {}, sphere: { radius: 0.4 } });
+    } else if (style === 'sphere') {
+      glViewer.setStyle({}, { sphere: {} });
+    } else if (style === 'line') {
+      glViewer.setStyle({}, { line: {} });
     }
-  }, [pubchemInfo, style3d]);
-
-  const render3D = () => {
-    if (!viewerRef.current) return;
-    
-    viewerRef.current.innerHTML = '';
-    const glViewer = (window as any).$3Dmol.createViewer(viewerRef.current, {
-      backgroundColor: '#ffffff'
-    });
-    
-    axios.get(`/api/pubchem/compound/cid/${pubchemInfo?.cid}/record/SDF/?record_type=3d`)
-      .then((res: any) => {
-        glViewer.addModel(res.data, 'sdf');
-        if (style3d === 'stick') {
-          glViewer.setStyle({}, { stick: {}, sphere: { radius: 0.4 } });
-        } else if (style3d === 'sphere') {
-          glViewer.setStyle({}, { sphere: {} });
-        } else if (style3d === 'line') {
-          glViewer.setStyle({}, { line: {} });
-        }
-        glViewer.zoomTo();
-        glViewer.render();
-      }).catch(console.error);
   };
+
+  useEffect(() => {
+    if (!pubchemInfo?.has3d || !viewerRef.current) return;
+    
+    const initViewer = () => {
+      if (!glViewerRef.current) {
+        viewerRef.current!.innerHTML = '';
+        glViewerRef.current = (window as any).$3Dmol.createViewer(viewerRef.current, {
+          backgroundColor: '#ffffff'
+        });
+      }
+      
+      const glViewer = glViewerRef.current;
+      glViewer.clear();
+      
+      axios.get(`/api/pubchem/compound/cid/${pubchemInfo.cid}/record/SDF/?record_type=3d`)
+        .then((res: any) => {
+          glViewer.addModel(res.data, 'sdf');
+          updateStyle(glViewer, style3d);
+          glViewer.zoomTo();
+          glViewer.render();
+        }).catch(console.error);
+    };
+
+    if (!(window as any).$3Dmol) {
+      const script = document.createElement('script');
+      script.src = 'https://3Dmol.org/build/3Dmol-min.js';
+      script.onload = initViewer;
+      document.head.appendChild(script);
+    } else {
+      initViewer();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pubchemInfo?.cid]);
+
+  useEffect(() => {
+    if (glViewerRef.current) {
+      updateStyle(glViewerRef.current, style3d);
+      glViewerRef.current.render();
+    }
+  }, [style3d]);
 
   return (
     <>
