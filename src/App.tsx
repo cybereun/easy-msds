@@ -1,9 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import * as $3Dmol from '3dmol';
 import { Search, Printer, AlertCircle, Droplet, Maximize2 } from 'lucide-react';
 import heroMolecule from './assets/hero_molecule.png';
 import './App.css';
+
+declare global {
+  interface Window {
+    $3Dmol?: any;
+    __easyMsds3DmolPromise?: Promise<any>;
+  }
+}
 
 const KOSHA_API_KEY = 'e979878bd9f70b89c6938bdf18f088a8f99d1c762c5252bbdc5c4275c72f7fb2';
 
@@ -36,6 +42,35 @@ interface ChemBasicInfo {
   enNo: string;
 }
 
+const load3Dmol = () => {
+  if (window.$3Dmol) return Promise.resolve(window.$3Dmol);
+
+  if (!window.__easyMsds3DmolPromise) {
+    window.__easyMsds3DmolPromise = new Promise((resolve, reject) => {
+      const existingScript = document.querySelector<HTMLScriptElement>('script[data-easymsds-3dmol]');
+      const script = existingScript ?? document.createElement('script');
+
+      script.src = `${import.meta.env.BASE_URL}3Dmol-min.js`;
+      script.async = true;
+      script.dataset.easymsds3dmol = 'true';
+      script.onload = () => {
+        if (window.$3Dmol) {
+          resolve(window.$3Dmol);
+        } else {
+          reject(new Error('3Dmol loaded without exposing window.$3Dmol'));
+        }
+      };
+      script.onerror = () => reject(new Error('Failed to load 3Dmol viewer script'));
+
+      if (!existingScript) {
+        document.head.appendChild(script);
+      }
+    });
+  }
+
+  return window.__easyMsds3DmolPromise;
+};
+
 function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -51,7 +86,8 @@ function App() {
   const printRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
   const viewerElementRef = useRef<HTMLDivElement | null>(null);
-  const glViewerRef = useRef<$3Dmol.GLViewer | null>(null);
+  const glViewerRef = useRef<any>(null);
+  const searchRequestRef = useRef(0);
 
   const handlePrint = () => {
     window.print();
@@ -70,7 +106,7 @@ function App() {
     return parser.parseFromString(xmlString, "text/xml");
   };
 
-  const fetchMSDSDetails = async (chemId: string) => {
+  const fetchMSDSDetails = async (chemId: string, requestId: number) => {
     const details: MsdsDetail[] = [];
     const titles = [
       "화학제품과 회사에 관한 정보", "유해성·위험성", "구성성분의 명칭 및 함유량",
@@ -84,7 +120,7 @@ function App() {
       const idxStr = i.toString().padStart(2, '0');
       try {
         const detailUrl = `/api/msds/getChemDetail${idxStr}?ServiceKey=${KOSHA_API_KEY}&chemId=${chemId}`;
-        const detailRes = await axios.get(detailUrl);
+        const detailRes = await axios.get(detailUrl, { timeout: 8000 });
         const detailXml = parseXML(detailRes.data);
         const detailItems = detailXml.querySelectorAll('item');
         
@@ -105,7 +141,9 @@ function App() {
         console.warn(`Failed to fetch detail ${idxStr}`, err);
       }
     }
-    setMsdsData(details);
+    if (searchRequestRef.current === requestId) {
+      setMsdsData(details);
+    }
   };
 
   const fetchPubChem = async (word: string) => {
@@ -159,6 +197,8 @@ function App() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchTerm.trim()) return;
+    const requestId = searchRequestRef.current + 1;
+    searchRequestRef.current = requestId;
     
     setLoading(true);
     setError(null);
@@ -209,15 +249,20 @@ function App() {
         queryForGlobal = engName;
       }
 
+      void fetchMSDSDetails(chemId, requestId).catch((err) => {
+        console.warn('Failed to fetch MSDS details', err);
+      });
+
       await Promise.allSettled([
-        fetchMSDSDetails(chemId),
         fetchPubChem(queryForGlobal),
         fetchChEMBL(queryForGlobal)
       ]);
     } catch (err: any) {
       setError(err.message || '데이터를 불러오는 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      if (searchRequestRef.current === requestId) {
+        setLoading(false);
+      }
     }
   };
 
@@ -232,9 +277,13 @@ function App() {
   };
 
   useEffect(() => {
-    if (!pubchemInfo?.has3d || !viewerRef.current) return;
+    if (loading || !pubchemInfo?.has3d || !viewerRef.current) return;
+    let cancelled = false;
     
-    const initViewer = () => {
+    const initViewer = async () => {
+      const $3Dmol = await load3Dmol();
+      if (cancelled || !viewerRef.current) return;
+
       const viewerElement = viewerRef.current!;
 
       if (!glViewerRef.current || viewerElementRef.current !== viewerElement) {
@@ -257,9 +306,13 @@ function App() {
         }).catch(console.error);
     };
 
-    initViewer();
+    initViewer().catch(console.error);
+
+    return () => {
+      cancelled = true;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pubchemInfo?.cid]);
+  }, [loading, pubchemInfo?.cid, pubchemInfo?.has3d]);
 
   useEffect(() => {
     if (glViewerRef.current) {
