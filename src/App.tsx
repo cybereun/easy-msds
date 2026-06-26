@@ -7,7 +7,6 @@ import './App.css';
 declare global {
   interface Window {
     $3Dmol?: any;
-    __easyMsds3DmolPromise?: Promise<any>;
   }
 }
 
@@ -20,6 +19,7 @@ interface PubChemInfo {
   iupac: string;
   inchiKey: string;
   has3d: boolean;
+  sdf3D: string | null;
 }
 
 interface ChemblInfo {
@@ -42,35 +42,6 @@ interface ChemBasicInfo {
   enNo: string;
 }
 
-const load3Dmol = () => {
-  if (window.$3Dmol) return Promise.resolve(window.$3Dmol);
-
-  if (!window.__easyMsds3DmolPromise) {
-    window.__easyMsds3DmolPromise = new Promise((resolve, reject) => {
-      const existingScript = document.querySelector<HTMLScriptElement>('script[data-easymsds-3dmol]');
-      const script = existingScript ?? document.createElement('script');
-
-      script.src = `${import.meta.env.BASE_URL}3Dmol-min.js`;
-      script.async = true;
-      script.dataset.easymsds3dmol = 'true';
-      script.onload = () => {
-        if (window.$3Dmol) {
-          resolve(window.$3Dmol);
-        } else {
-          reject(new Error('3Dmol loaded without exposing window.$3Dmol'));
-        }
-      };
-      script.onerror = () => reject(new Error('Failed to load 3Dmol viewer script'));
-
-      if (!existingScript) {
-        document.head.appendChild(script);
-      }
-    });
-  }
-
-  return window.__easyMsds3DmolPromise;
-};
-
 function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -80,7 +51,7 @@ function App() {
   const [chemblInfo, setChemblInfo] = useState<ChemblInfo | null>(null);
   const [msdsData, setMsdsData] = useState<MsdsDetail[]>([]);
   const [chemBasicInfo, setChemBasicInfo] = useState<ChemBasicInfo | null>(null);
-  const [style3d, setStyle3d] = useState<'stick' | 'sphere' | 'line'>('sphere');
+  const [style3d, setStyle3d] = useState<'stick' | 'sphere' | 'line'>('stick');
   const [hasInteracted3D, setHasInteracted3D] = useState(false);
   
   const printRef = useRef<HTMLDivElement>(null);
@@ -154,11 +125,13 @@ function App() {
       const propRes = await axios.get(`/api/pubchem/compound/cid/${cid}/property/MolecularFormula,MolecularWeight,IUPACName,InChIKey/JSON`);
       const props = propRes.data.PropertyTable.Properties[0];
 
-      let has3d = false;
+      let sdf3D: string | null = null;
       try {
-        await axios.get(`/api/pubchem/compound/cid/${cid}/record/SDF/?record_type=3d`);
-        has3d = true;
-      } catch(e) { has3d = false; }
+        const sdfRes = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/SDF?record_type=3d`);
+        if (sdfRes.ok) {
+          sdf3D = await sdfRes.text();
+        }
+      } catch(e) { sdf3D = null; }
 
       setPubchemInfo({
         cid,
@@ -166,7 +139,8 @@ function App() {
         weight: props.MolecularWeight || '-',
         iupac: props.IUPACName || '-',
         inchiKey: props.InChIKey || '-',
-        has3d
+        has3d: Boolean(sdf3D),
+        sdf3D
       });
     } catch (err) {
       console.warn("PubChem 정보를 찾을 수 없습니다.", word);
@@ -267,52 +241,30 @@ function App() {
   };
 
   const updateStyle = (glViewer: any, style: string) => {
-    if (style === 'stick') {
-      glViewer.setStyle({}, { stick: {}, sphere: { radius: 0.4 } });
-    } else if (style === 'sphere') {
-      glViewer.setStyle({}, { sphere: {} });
-    } else if (style === 'line') {
-      glViewer.setStyle({}, { line: {} });
-    }
+    glViewer.setStyle({}, {});
+    if (style === 'stick') glViewer.setStyle({}, { stick: { radius: 0.18 }, sphere: { scale: 0.25 } });
+    else if (style === 'sphere') glViewer.setStyle({}, { sphere: { radius: 0.6 } });
+    else if (style === 'line') glViewer.setStyle({}, { line: {} });
   };
 
   useEffect(() => {
-    if (loading || !pubchemInfo?.has3d || !viewerRef.current) return;
-    let cancelled = false;
-    
-    const initViewer = async () => {
-      const $3Dmol = await load3Dmol();
-      if (cancelled || !viewerRef.current) return;
+    if (loading || !pubchemInfo?.sdf3D || !viewerRef.current || !window.$3Dmol) return;
 
-      const viewerElement = viewerRef.current!;
-
-      if (!glViewerRef.current || viewerElementRef.current !== viewerElement) {
-        viewerElement.innerHTML = '';
-        glViewerRef.current = $3Dmol.createViewer(viewerElement, {
-          backgroundColor: '#ffffff'
-        });
-        viewerElementRef.current = viewerElement;
-      }
-      
-      const glViewer = glViewerRef.current;
-      glViewer.clear();
-      
-      axios.get(`/api/pubchem/compound/cid/${pubchemInfo.cid}/record/SDF/?record_type=3d`)
-        .then((res: any) => {
-          glViewer.addModel(res.data, 'sdf');
-          updateStyle(glViewer, style3d);
-          glViewer.zoomTo();
-          glViewer.render();
-        }).catch(console.error);
-    };
-
-    initViewer().catch(console.error);
-
-    return () => {
-      cancelled = true;
-    };
+    viewerRef.current.innerHTML = '';
+    try {
+      const viewer = window.$3Dmol.createViewer(viewerRef.current, { backgroundColor: '#ffffff' });
+      glViewerRef.current = viewer;
+      viewerElementRef.current = viewerRef.current;
+      viewer.addModel(pubchemInfo.sdf3D, 'sdf');
+      updateStyle(viewer, 'stick');
+      viewer.zoomTo();
+      viewer.render();
+      setStyle3d('stick');
+    } catch (err) {
+      console.error('Failed to render 3D molecule viewer', err);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, pubchemInfo?.cid, pubchemInfo?.has3d]);
+  }, [loading, pubchemInfo?.cid, pubchemInfo?.sdf3D]);
 
   useEffect(() => {
     if (glViewerRef.current) {
