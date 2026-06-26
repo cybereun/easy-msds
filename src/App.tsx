@@ -52,7 +52,6 @@ function App() {
   const [msdsData, setMsdsData] = useState<MsdsDetail[]>([]);
   const [chemBasicInfo, setChemBasicInfo] = useState<ChemBasicInfo | null>(null);
   const [style3d, setStyle3d] = useState<'stick' | 'sphere' | 'line'>('stick');
-  const [hasInteracted3D, setHasInteracted3D] = useState(false);
   
   const printRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
@@ -180,7 +179,6 @@ function App() {
     setPubchemInfo(null);
     setChemblInfo(null);
     setChemBasicInfo(null);
-    setHasInteracted3D(false);
     viewerElementRef.current = null;
     glViewerRef.current = null;
 
@@ -387,29 +385,22 @@ function App() {
                       <div className="style3d-buttons">
                         <button 
                           className={`style3d-btn ${style3d === 'stick' ? 'active' : ''}`}
-                          onClick={() => { setStyle3d('stick'); setHasInteracted3D(true); }}
+                          onClick={() => setStyle3d('stick')}
                         >STICK</button>
                         <button 
                           className={`style3d-btn ${style3d === 'sphere' ? 'active' : ''}`}
-                          onClick={() => { setStyle3d('sphere'); setHasInteracted3D(true); }}
+                          onClick={() => setStyle3d('sphere')}
                         >SPHERE</button>
                         <button 
                           className={`style3d-btn ${style3d === 'line' ? 'active' : ''}`}
-                          onClick={() => { setStyle3d('line'); setHasInteracted3D(true); }}
+                          onClick={() => setStyle3d('line')}
                         >LINE</button>
                       </div>
                     )}
                   </div>
                   <div className="visual-box">
                     {pubchemInfo.has3d ? (
-                      <>
-                        <div ref={viewerRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}></div>
-                        {!hasInteracted3D && (
-                          <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(255,255,255,0.9)', padding: '8px 16px', borderRadius: '20px', color: 'var(--primary)', fontWeight: 'bold', pointerEvents: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', zIndex: 10 }}>
-                            💡 STICK를 클릭하세요
-                          </div>
-                        )}
-                      </>
+                      <div ref={viewerRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}></div>
                     ) : (
                       <div style={{color:'var(--text-muted)'}}>3D 구조 정보가 없습니다.</div>
                     )}
