@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import * as $3Dmol from '3dmol';
 import { Search, Printer, AlertCircle, Droplet, Maximize2 } from 'lucide-react';
 import heroMolecule from './assets/hero_molecule.png';
 import './App.css';
@@ -49,7 +50,8 @@ function App() {
   
   const printRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
-  const glViewerRef = useRef<any>(null);
+  const viewerElementRef = useRef<HTMLDivElement | null>(null);
+  const glViewerRef = useRef<$3Dmol.GLViewer | null>(null);
 
   const handlePrint = () => {
     window.print();
@@ -165,6 +167,8 @@ function App() {
     setChemblInfo(null);
     setChemBasicInfo(null);
     setHasInteracted3D(false);
+    viewerElementRef.current = null;
+    glViewerRef.current = null;
 
     try {
       const cleanSearchTerm = searchTerm.trim();
@@ -231,11 +235,14 @@ function App() {
     if (!pubchemInfo?.has3d || !viewerRef.current) return;
     
     const initViewer = () => {
-      if (!glViewerRef.current) {
-        viewerRef.current!.innerHTML = '';
-        glViewerRef.current = (window as any).$3Dmol.createViewer(viewerRef.current, {
+      const viewerElement = viewerRef.current!;
+
+      if (!glViewerRef.current || viewerElementRef.current !== viewerElement) {
+        viewerElement.innerHTML = '';
+        glViewerRef.current = $3Dmol.createViewer(viewerElement, {
           backgroundColor: '#ffffff'
         });
+        viewerElementRef.current = viewerElement;
       }
       
       const glViewer = glViewerRef.current;
@@ -250,14 +257,7 @@ function App() {
         }).catch(console.error);
     };
 
-    if (!(window as any).$3Dmol) {
-      const script = document.createElement('script');
-      script.src = 'https://3Dmol.org/build/3Dmol-min.js';
-      script.onload = initViewer;
-      document.head.appendChild(script);
-    } else {
-      initViewer();
-    }
+    initViewer();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pubchemInfo?.cid]);
 
