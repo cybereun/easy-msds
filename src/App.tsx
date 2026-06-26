@@ -239,7 +239,7 @@ function App() {
     });
     
     axios.get(`/api/pubchem/compound/cid/${pubchemInfo?.cid}/record/SDF/?record_type=3d`)
-      .then(res => {
+      .then((res: any) => {
         glViewer.addModel(res.data, 'sdf');
         if (style3d === 'stick') {
           glViewer.setStyle({}, { stick: {}, sphere: { radius: 0.4 } });
