@@ -108,15 +108,15 @@ function App() {
 
   const fetchPubChem = async (word: string) => {
     try {
-      const cidRes = await axios.get(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(word)}/cids/JSON`);
+      const cidRes = await axios.get(`/api/pubchem/compound/name/${encodeURIComponent(word)}/cids/JSON`);
       const cid = cidRes.data.IdentifierList.CID[0];
 
-      const propRes = await axios.get(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/MolecularFormula,MolecularWeight,IUPACName,InChIKey/JSON`);
+      const propRes = await axios.get(`/api/pubchem/compound/cid/${cid}/property/MolecularFormula,MolecularWeight,IUPACName,InChIKey/JSON`);
       const props = propRes.data.PropertyTable.Properties[0];
 
       let has3d = false;
       try {
-        await axios.head(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/record/SDF/?record_type=3d`);
+        await axios.get(`/api/pubchem/compound/cid/${cid}/record/SDF/?record_type=3d`);
         has3d = true;
       } catch(e) { has3d = false; }
 
@@ -241,7 +241,7 @@ function App() {
       const glViewer = glViewerRef.current;
       glViewer.clear();
       
-      axios.get(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${pubchemInfo.cid}/record/SDF/?record_type=3d`)
+      axios.get(`/api/pubchem/compound/cid/${pubchemInfo.cid}/record/SDF/?record_type=3d`)
         .then((res: any) => {
           glViewer.addModel(res.data, 'sdf');
           updateStyle(glViewer, style3d);
