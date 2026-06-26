@@ -382,7 +382,8 @@ body {
   padding: 12px 16px;
   color: var(--text-muted);
   white-space: pre-wrap;
-  word-break: keep-all;
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .style3d-buttons { display: flex; gap: 8px; }
