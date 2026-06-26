@@ -449,6 +449,10 @@ function App() {
 
         </div>
       )}
+
+      <footer style={{ marginTop: 'auto', textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)', fontSize: '0.9rem', borderTop: '1px solid var(--border-color)' }}>
+        2026 &copy; 개발자 Cybereun | EasyMSDS. All scientific rights reserved.
+      </footer>
     </div>
     </>
   );
